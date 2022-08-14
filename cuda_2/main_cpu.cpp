@@ -4,7 +4,7 @@
 
 using namespace std;
 
-void vecMultiple(float** A, float** B, float** C, int n) {
+void vecMultiplication(float** A, float** B, float** C, int n) {
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             for (int k = 0; k < n; k++) {
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
 
     gettimeofday(&t1, NULL);
 
-    vecMultiple(a, b, c, n);
+    vecMultiplication(a, b, c, n);
 
     gettimeofday(&t2, NULL);
 

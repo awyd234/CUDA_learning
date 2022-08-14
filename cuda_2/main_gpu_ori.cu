@@ -6,10 +6,34 @@
 using namespace std;
 
 __global__
-void vecMultipleKernel(float* A_d, float* B_d, float* C_d, int n)
+void vecMultiplicationKernel(float* A_d, float* B_d, float* C_d, int n)
 {
-    int i = threadIdx.x + blockDim.x * blockIdx.x;
-    if (i < n) C_d[i] = A_d[i] + B_d[i];
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (x < n && y < n) {
+        float sum = 0;
+        for (int k = 0; k < n; k++) {
+            sum += A_d[y * n + k] * B_d[k * n + x];
+        }
+        C_d[y * n + x] = sum;
+    }
+}
+
+void visit_2d_array(float *data, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%f ", data[i * n + j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+void initial_matrix(float *data, int n) {
+    for (int i = 0; i < n; i++) {
+        data[i] = rand() / double(RAND_MAX);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -17,32 +41,24 @@ int main(int argc, char *argv[]) {
     int n = atoi(argv[1]);
     cout << n << endl;
 
-    size_t size = n * sizeof(float);
+    size_t size = n * n * sizeof(float);
 
     // host memery
-    float **a = (float **)malloc(n * sizeof(float*));
-    float **b = (float **)malloc(n * sizeof(float*));
-    float **c = (float **)malloc(n * sizeof(float*));
+    float *a = (float *)malloc(size);
+    float *b = (float *)malloc(size);
+    float *c = (float *)malloc(size);
 
-    for (int i = 0; i < n; i++) {
-        a[i] = (float *)malloc(n * sizeof(float));
-        b[i] = (float *)malloc(n * sizeof(float));
-        c[i] = (float *)malloc(n * sizeof(float));
-
-        for (int j = 0; j < n; j++) {
-            a[i][j] = rand() / double(RAND_MAX);
-            b[i][j] = rand() / double(RAND_MAX);
-        }
-    }
+    initial_matrix(a, n * n);
+    initial_matrix(b, n * n);
 
 
     float *da = NULL;
     float *db = NULL;
     float *dc = NULL;
 
-    cudaMalloc((void **)&da, size * size);
-    cudaMalloc((void **)&db, size * size);
-    cudaMalloc((void **)&dc, size * size);
+    cudaMalloc((void **)&da, size);
+    cudaMalloc((void **)&db, size);
+    cudaMalloc((void **)&dc, size);
 
     cudaMemcpy(da,a,size,cudaMemcpyHostToDevice);
     cudaMemcpy(db,b,size,cudaMemcpyHostToDevice);
@@ -50,13 +66,17 @@ int main(int argc, char *argv[]) {
 
     struct timeval t1, t2;
 
-    int threadPerBlock = 256;
-    int blockPerGrid = (n + threadPerBlock - 1)/threadPerBlock;
-    printf("threadPerBlock: %d \nblockPerGrid: %d \n",threadPerBlock,blockPerGrid);
+    // int threadPerBlock = 256;
+    // int blockPerGrid = (n + threadPerBlock - 1)/threadPerBlock;
+    // printf("threadPerBlock: %d \nblockPerGrid: %d \n",threadPerBlock,blockPerGrid);
+
+    int dimx = 5, dimy = 5;
+    dim3 block(dimx, dimy);
+    dim3 grid((n + block.x - 1) / block.x, (n + block.y - 1)/block.y);
 
     gettimeofday(&t1, NULL);
 
-    vecMultipleKernel <<< blockPerGrid, threadPerBlock >>> (da, db, dc, n);
+    vecMultiplicationKernel <<< block, grid >>> (da, db, dc, n);
 
     gettimeofday(&t2, NULL);
 
@@ -70,6 +90,10 @@ int main(int argc, char *argv[]) {
     cudaFree(da);
     cudaFree(db);
     cudaFree(dc);
+
+    // visit_2d_array(a, n);
+    // visit_2d_array(b, n);
+    // visit_2d_array(c, n);
 
     free(a);
     free(b);
